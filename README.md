@@ -26,7 +26,17 @@ and [component catalog](https://unixnu.com/reference/components).
 | `configs/` | Kernel configuration fragments |
 | `dts/sm8550.dtsi` | Shared hardware resources |
 | `patches/xnu/series` | Ordered SoC patches |
-| `kits/Sm8550Platform/` | GMU, command database, GPU SMMU operations |
+| `kits/Sm8550Platform/` | GMU, command database, GPU SMMU, GENI clocks and QUP DMA operations |
+
+`Sm8550GeniUart` selects UART14 sources from GPLL0-even, including 51.2 MHz for
+3.2 Mbaud. `Sm8550Gcc` serializes shared votes and releases the UART's acquired
+core/AHB votes when other serial engines do not hold them. It also provides the
+apps-SMMU configuration lock used by touch, audio and Bluetooth.
+
+`Sm8550QupDma` allocates an unused context bank and ASID, builds native 4 KiB
+tables with ArmSmmu4K and publishes the exact QUP stream after context readback.
+The sheng platform and shared-resource fixtures exercise these production
+operations; the kernel build compiles them for arm64e.
 
 Build verification and hardware observations are recorded separately.
 sheng is the initial device integration.
