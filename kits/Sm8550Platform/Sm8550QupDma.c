@@ -36,7 +36,7 @@ int sm8550_qup_dma_attach(const struct sm8550_qup_dma_io *io,struct sm8550_qup_d
         if(cbar){d->rejected_config++;d->rejected_cbar=cbar;continue;}
         uint32_t cba2r=io->read(io->context,0x1800+i*4);
         if(cba2r){d->rejected_config++;d->rejected_cba2r=cba2r;continue;}
-        if(!io->read(io->context,cb) && !(io->read(io->context,cb+0x58)&0xc00001feu)){bank=i;break;}
+        if(!(io->read(io->context,cb)&1u) && !(io->read(io->context,cb+0x58)&0xc00001feu)){bank=i;break;}
     }
     if(bank==banks){d->exhausted=2;return -ENOSPC;}
     for(unsigned candidate=1;candidate<256;candidate++) {
