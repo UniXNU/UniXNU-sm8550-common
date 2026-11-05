@@ -12,6 +12,9 @@ int sm8550_qup_dma_attach(const struct sm8550_qup_dma_io *io,struct sm8550_qup_d
     if(!io || !io->read || !io->write || !io->delay_us || !io->publish || !d || !tables ||
         !bytes || bytes>0x200000 || (bytes&4095) || (pa&4095) || (tpa&4095) || sid>0x7fff || d->active || d->poisoned)return -EINVAL;
     uint32_t id0=io->read(io->context,0x20),id1=io->read(io->context,0x24),id2=io->read(io->context,0x28);
+    d->id0=id0;d->id1=id1;d->id2=id2;
+    d->free_slots=d->unused_banks=d->rejected_config=d->exhausted=0;
+    d->rejected_cbar=d->rejected_cba2r=0;
     unsigned slots=id0&255,banks=id1&255,pages=1u<<(((id1>>28)&7)+1);
     if(!(id0&(1u<<30)) || !(id0&(1u<<27)) || (id0&(1u<<8)) || !(id2&(1u<<12)) ||
         !slots || slots>128 || banks<2 || banks>128 || (id1>>31) || (pages+banks)*4096>0xd0000)return -ENOTSUP;
@@ -20,17 +23,22 @@ int sm8550_qup_dma_attach(const struct sm8550_qup_dma_io *io,struct sm8550_qup_d
     bool used[128]={false};unsigned slot=slots,bank=banks,asid=0;
     for(unsigned i=0;i<slots;i++) {
         uint32_t smr=io->read(io->context,0x800+i*4),s2cr=io->read(io->context,0xc00+i*4);
-        if(!(smr&(1u<<31))) {if(slot==slots)slot=i;continue;}
+        if(!(smr&(1u<<31))) {d->free_slots++;if(slot==slots)slot=i;continue;}
         if(((s2cr>>16)&3)==0 && (s2cr&255)<banks)used[s2cr&255]=true;
         if(!((smr^sid)&0x7fff&~((smr>>16)&0x7fff)))return -EBUSY;
     }
-    if(slot==slots)return -ENOSPC;
+    if(slot==slots){d->exhausted=1;return -ENOSPC;}
     for(unsigned i=1;i<banks;i++) {
         unsigned cb=(pages+i)*4096;
-        if(!used[i] && !io->read(io->context,0x1000+i*4) && !io->read(io->context,0x1800+i*4) &&
-            !io->read(io->context,cb) && !(io->read(io->context,cb+0x58)&0xc00001feu)){bank=i;break;}
+        if(used[i])continue;
+        d->unused_banks++;
+        uint32_t cbar=io->read(io->context,0x1000+i*4);
+        if(cbar){d->rejected_config++;d->rejected_cbar=cbar;continue;}
+        uint32_t cba2r=io->read(io->context,0x1800+i*4);
+        if(cba2r){d->rejected_config++;d->rejected_cba2r=cba2r;continue;}
+        if(!io->read(io->context,cb) && !(io->read(io->context,cb+0x58)&0xc00001feu)){bank=i;break;}
     }
-    if(bank==banks)return -ENOSPC;
+    if(bank==banks){d->exhausted=2;return -ENOSPC;}
     for(unsigned candidate=1;candidate<256;candidate++) {
         bool taken=false;
         for(unsigned i=0;i<banks;i++)if(used[i] || (io->read(io->context,(pages+i)*4096)&1)) {
@@ -39,7 +47,7 @@ int sm8550_qup_dma_attach(const struct sm8550_qup_dma_io *io,struct sm8550_qup_d
         }
         if(!taken){asid=candidate;break;}
     }
-    if(!asid)return -ENOSPC;
+    if(!asid){d->exhausted=3;return -ENOSPC;}
     unsigned output=bits((id2>>4)&15);if(!output)return -ENOTSUP;
     ArmSmmu4KConfig cfg={32,output,tpa,bytes/4096};
     ArmSmmu4KRange range={SM8550_QUP_DMA_IOVA,pa,bytes,ArmSmmu4KRead|ArmSmmu4KWrite,1,3};
