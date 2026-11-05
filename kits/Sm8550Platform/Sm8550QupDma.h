@@ -19,7 +19,7 @@ struct sm8550_qup_dma {
     unsigned bank,slot,asid,pages;
     /* Selection evidence from existing reads, with no diagnostic MMIO scan.
      * exhausted: 1 stream slots, 2 context banks, 3 ASIDs. */
-    uint32_t id0,id1,id2,rejected_cbar,rejected_cba2r;
+    uint32_t id0,id1,id2,rejected_cbar,rejected_cba2r,rejected_sctlr,rejected_fsr;
     unsigned free_slots,unused_banks,rejected_config,exhausted;
     bool active,poisoned;
 };

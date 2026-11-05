@@ -14,7 +14,7 @@ int sm8550_qup_dma_attach(const struct sm8550_qup_dma_io *io,struct sm8550_qup_d
     uint32_t id0=io->read(io->context,0x20),id1=io->read(io->context,0x24),id2=io->read(io->context,0x28);
     d->id0=id0;d->id1=id1;d->id2=id2;
     d->free_slots=d->unused_banks=d->rejected_config=d->exhausted=0;
-    d->rejected_cbar=d->rejected_cba2r=0;
+    d->rejected_cbar=d->rejected_cba2r=d->rejected_sctlr=d->rejected_fsr=0;
     unsigned slots=id0&255,banks=id1&255,pages=1u<<(((id1>>28)&7)+1);
     if(!(id0&(1u<<30)) || !(id0&(1u<<27)) || (id0&(1u<<8)) || !(id2&(1u<<12)) ||
         !slots || slots>128 || banks<2 || banks>128 || (id1>>31) || (pages+banks)*4096>0xd0000)return -ENOTSUP;
@@ -36,7 +36,10 @@ int sm8550_qup_dma_attach(const struct sm8550_qup_dma_io *io,struct sm8550_qup_d
         if(cbar){d->rejected_config++;d->rejected_cbar=cbar;continue;}
         uint32_t cba2r=io->read(io->context,0x1800+i*4);
         if(cba2r){d->rejected_config++;d->rejected_cba2r=cba2r;continue;}
-        if(!(io->read(io->context,cb)&1u) && !(io->read(io->context,cb+0x58)&0xc00001feu)){bank=i;break;}
+        d->rejected_sctlr=io->read(io->context,cb);
+        if(d->rejected_sctlr&1u)continue;
+        d->rejected_fsr=io->read(io->context,cb+0x58);
+        if(!(d->rejected_fsr&0xc00001feu)){bank=i;break;}
     }
     if(bank==banks){d->exhausted=2;return -ENOSPC;}
     for(unsigned candidate=1;candidate<256;candidate++) {
