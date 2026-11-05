@@ -35,6 +35,9 @@ apps-SMMU configuration lock used by touch, audio and Bluetooth.
 
 `Sm8550QupDma` allocates an unused context bank and ASID, builds native 4 KiB
 tables with ArmSmmu4K and publishes the exact QUP stream after context readback.
+A disabled bank has SCTLR.M clear; retained SCTLR configuration bits do not
+exclude it. Failure diagnostics retain the original selection reads, including
+context enable and fault status, without an extra MMIO scan.
 The sheng platform and shared-resource fixtures exercise these production
 operations; the kernel build compiles them for arm64e.
 
