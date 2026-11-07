@@ -11,7 +11,9 @@
 extern "C" {
 #endif
 #define SM8550_APPS_SMMU_BASE 0x15000000ULL
-#define SM8550_APPS_SMMU_SIZE 0x000d0000ULL
+/* sm8550.dtsi apps_smmu reg: 2 x 128 register pages of 4 KiB, the size the SMMU architecture defines (the banks implemented end at
+ * 0xd0000) */
+#define SM8550_APPS_SMMU_SIZE 0x00100000ULL
 #define SM8550_APPS_SMMU_MAX_STREAMS 8u
 
 struct sm8550_apps_smmu_io {
